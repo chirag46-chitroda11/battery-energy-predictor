@@ -1,103 +1,87 @@
 import gradio as gr
 from sklearn.ensemble import RandomForestRegressor
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
 
-# Train dummy model
+# ✅ Train model
 def train_model():
+    np.random.seed(42)
     X = np.random.rand(100, 3)
     y = X @ [0.2, 1.5, 10.0] + np.random.randn(100) * 0.5
-    model = RandomForestRegressor()
+    model = RandomForestRegressor(n_estimators=100)
     model.fit(X, y)
     return model
 
 model = train_model()
 
-# Prediction for single input
+# ✅ Prediction
 def predict_energy(batch_size, temperature, load):
     input_data = np.array([[batch_size, temperature, load]])
-    prediction = model.predict(input_data)[0]
+    prediction = model.predict(input_data)
+    return f"⚡ Estimated Energy Consumption: {prediction[0]:.2f} kWh"
 
-    # Line chart of Energy vs Batch Size
-    batch_range = np.linspace(100, 500, 50)
-    inputs = np.array([[b, temperature, load] for b in batch_range])
-    preds = model.predict(inputs)
+# 🎨 Vibrant CSS
+custom_css = """
+body {
+    background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 50%, #fbc2eb 100%);
+    font-family: 'Segoe UI', sans-serif;
+    background-attachment: fixed;
+}
+#title {
+    text-align: center;
+    color: #ffffff;
+    font-size: 2.8em;
+    font-weight: bold;
+    padding: 20px;
+    text-shadow: 1px 1px 6px #000;
+}
+.card {
+    background-color: rgba(255, 255, 255, 0.95);
+    padding: 25px;
+    border-radius: 16px;
+    box-shadow: 0px 0px 18px rgba(0,0,0,0.25);
+    height: 100%;
+}
+.gr-button {
+    font-weight: bold;
+    font-size: 1.1em;
+}
+.footer {
+    text-align: center;
+    color: #222;
+    font-size: 14px;
+    margin-top: 40px;
+}
+"""
 
-    plt.figure(figsize=(6, 3.5))
-    plt.plot(batch_range, preds, color="orange", marker="o", label="Predicted")
-    plt.axvline(x=batch_size, color="blue", linestyle="--", label="Your Batch")
-    plt.title("Predicted Energy vs Batch Size")
-    plt.xlabel("Batch Size")
-    plt.ylabel("Energy (kWh)")
-    plt.grid(True)
-    plt.legend()
-    plt.tight_layout()
-
-    return f"⚡ Estimated Energy Consumption: {prediction:.2f} kWh", plt
-
-# Batch prediction using CSV
-def predict_from_csv(file):
-    try:
-        df = pd.read_csv(file.name)
-        if not {"Batch Size", "Temperature", "Load"}.issubset(df.columns):
-            return "❌ CSV must contain columns: Batch Size, Temperature, Load"
-        X = df[["Batch Size", "Temperature", "Load"]]
-        y_pred = model.predict(X)
-        df["Predicted Energy (kWh)"] = y_pred
-        return df
-    except Exception as e:
-        return f"❌ Error: {e}"
-
-# Theme toggle logic
-def get_theme(toggle):
-    return "soft" if toggle == "Light" else "dark"
-
-# UI Blocks
-with gr.Blocks(theme=get_theme("Light")) as demo:
-    gr.Markdown("## 🔋 **Battery Cell Energy Predictor**")
-    gr.Markdown("Use this tool to estimate energy consumption for a battery cell batch. You can also upload CSV for batch predictions.")
-
-    with gr.Row():
-        with gr.Column():
-            batch = gr.Slider(100, 500, value=250, label="📦 Batch Size")
-            temp = gr.Slider(20, 40, value=30, label="🌡 Temperature (°C)")
-            load = gr.Slider(0.5, 1.5, value=1.0, label="⚙️ Machine Load")
-            theme_toggle = gr.Radio(["Light", "Dark"], value="Light", label="🎨 Theme")
-            predict_btn = gr.Button("🚀 Predict Energy")
-            reset_btn = gr.Button("🧹 Reset")
-
-        with gr.Column():
-            output_text = gr.Textbox(label="🔋 Estimated Output")
-            output_plot = gr.Plot(label="📊 Energy vs Batch Size Chart")
+# 🚀 Build Gradio App
+with gr.Blocks(css=custom_css) as demo:
+    gr.Markdown("<h1 id='title'>🔋 Battery Energy Predictor</h1>")
+    gr.Markdown("<p style='text-align:center; color:white; font-size:18px;'>Enter parameters to predict battery cell manufacturing energy usage.</p>")
 
     with gr.Row():
-        gr.Markdown("### 📤 Upload CSV for Batch Predictions")
-        csv_input = gr.File(file_types=[".csv"], label="Upload CSV with columns: Batch Size, Temperature, Load")
-        csv_output = gr.Dataframe(label="📄 Prediction Output")
+        with gr.Column(scale=1, elem_classes="card"):
+            gr.Markdown("### 🧠 How It Works:")
+            gr.Markdown(
+                "- Fill in batch size, machine load, and temperature.\n"
+                "- Press *Predict Energy* to get estimated energy consumption in kWh.\n"
+                "- Powered by Random Forest ML model (trained on dummy data)."
+            )
 
-    # Event bindings
-    predict_btn.click(
-        fn=predict_energy,
-        inputs=[batch, temp, load],
-        outputs=[output_text, output_plot]
-    )
+        with gr.Column(scale=1, elem_classes="card"):
+            batch_size = gr.Number(label="📦 Batch Size", value=250)
+            temperature = gr.Number(label="🌡 Temperature (°C)", value=30.0)
+            load = gr.Number(label="⚙ Machine Load", value=1.0)
+            submit_btn = gr.Button("🚀 Predict Energy", variant="primary")
+            clear_btn = gr.Button("🧹 Reset", variant="secondary")
 
-    reset_btn.click(
-        fn=lambda: ("", None),
-        inputs=[],
-        outputs=[output_text, output_plot]
-    )
+        with gr.Column(scale=1, elem_classes="card"):
+            result = gr.Textbox(label="📊 Estimated Output", interactive=False, lines=2)
+            gr.Markdown("#### 📌 Model Info:")
+            gr.Markdown("- Algorithm: Random Forest\n- Trained samples: 100\n- Output: *Energy (kWh)*")
 
-    csv_input.change(
-        fn=predict_from_csv,
-        inputs=csv_input,
-        outputs=csv_output
-    )
+    submit_btn.click(predict_energy, inputs=[batch_size, temperature, load], outputs=result)
+    clear_btn.click(lambda: (250, 30.0, 1.0, ""), outputs=[batch_size, temperature, load, result])
 
-    theme_toggle.change(
-        fn=lambda x: demo.set_theme(get_theme(x)),
-        inputs=theme_toggle
-    )
+    gr.Markdown("<div class='footer'>✨ Created by Team Turtle 🐢 • Open Source on Hugging Face • Har Har Mahadev 🔱</div>")
 
 demo.launch()
